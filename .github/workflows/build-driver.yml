@@ -114,7 +114,10 @@ jobs:
 
           rem Create a temporary self-signed test certificate, sign the catalog,
           rem and export the public certificate so the target PC can trust it.
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Cyclone2DpadFilter Test Certificate' -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(3); Export-Certificate -Cert $cert -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' | Out-Null; Set-Content -Path '%PKG%\Cyclone2DpadFilter-TestCert-Thumbprint.txt' -Value $cert.Thumbprint"
+          rem Also import the test cert into the machine Root and TrustedPublisher
+          rem stores so the catalog's chain validates here (and to mirror what the
+          rem user must do on their own PC before installing).
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Cyclone2DpadFilter Test Certificate' -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(3); Export-Certificate -Cert $cert -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' | Out-Null; Import-Certificate -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' -CertStoreLocation 'Cert:\LocalMachine\Root' | Out-Null; Import-Certificate -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' -CertStoreLocation 'Cert:\LocalMachine\TrustedPublisher' | Out-Null; Set-Content -Path '%PKG%\Cyclone2DpadFilter-TestCert-Thumbprint.txt' -Value $cert.Thumbprint"
           if errorlevel 1 ( echo certificate creation failed & exit /b 1 )
 
           for /f "usebackq delims=" %%T in ("%PKG%\Cyclone2DpadFilter-TestCert-Thumbprint.txt") do set "CERT_THUMBPRINT=%%T"
