@@ -27,19 +27,38 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Download and mount the EWDK
+      # The EWDK ISO is ~5 GB. Cache it so reruns and the second matrix job
+      # skip the download.
+      - name: Cache EWDK ISO
+        id: ewdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\ewdk.iso
+          key: ewdk-iso-25h2-26100-linkid2335681
+
+      - name: Download EWDK ISO
+        if: steps.ewdk-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $iso = "$env:RUNNER_TEMP\ewdk.iso"
 
           # Windows 11 25H2 EWDK (build 26100) with Visual Studio Build Tools
-          # 17.14.0, which matches the windows-2022 runner. The EWDK is a
-          # self-contained ISO that ships the SDK, WDK, build tools, and the
-          # driver MSBuild targets, so no Visual Studio / WDK VSIX integration
-          # is required. fwlink from the EWDK download page.
+          # 17.14.0, matching the windows-2022 runner. Self-contained: SDK, WDK,
+          # build tools, and driver MSBuild targets, so no VS / WDK VSIX setup is
+          # needed. Use curl.exe rather than Invoke-WebRequest, which is orders
+          # of magnitude slower on multi-GB files. fwlink from the EWDK page.
           Write-Host "Downloading EWDK ISO..."
-          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2335681" -OutFile $iso -UseBasicParsing
+          curl.exe -L --fail --retry 3 --retry-delay 5 -o "$iso" "https://go.microsoft.com/fwlink/?linkid=2335681"
+          if ($LASTEXITCODE -ne 0) {
+            throw "curl exited with $LASTEXITCODE"
+          }
+
+      - name: Mount EWDK ISO
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iso = "$env:RUNNER_TEMP\ewdk.iso"
 
           Write-Host "Mounting EWDK ISO..."
           $mount = Mount-DiskImage -ImagePath $iso -PassThru
