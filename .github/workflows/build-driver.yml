@@ -97,7 +97,18 @@ jobs:
           )
           echo Using MSBUILD=%MSBUILD%
 
-          "%MSBUILD%" "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /v:minimal
+          rem The EWDK leaves VCTargetsPath without its drive/prefix (it derives
+          rem from the unset VSINSTALLDIR), so the Microsoft.Cpp imports fail.
+          rem Point it at the EWDK's VC targets directory explicitly.
+          set "VCTargetsPath=%VSROOT%\MSBuild\Microsoft\VC\v170\"
+          echo VCTargetsPath=%VCTargetsPath%
+          if not exist "%VCTargetsPath%Microsoft.Cpp.Default.props" (
+            echo VCTargetsPath invalid: %VCTargetsPath%
+            dir /b "%VSROOT%\MSBuild\Microsoft\VC"
+            exit /b 1
+          )
+
+          "%MSBUILD%" "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:VCTargetsPath="%VCTargetsPath%" /v:minimal
           if errorlevel 1 (
             echo msbuild failed
             exit /b 1
