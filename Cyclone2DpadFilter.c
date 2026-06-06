@@ -110,11 +110,7 @@ static VOID CycloneForwardWithCompletion(_In_ WDFDEVICE Device, _In_ WDFREQUEST 
     WDF_REQUEST_SEND_OPTIONS options;
     NTSTATUS status;
 
-    status = WdfRequestFormatRequestUsingCurrentType(Request);
-    if (!NT_SUCCESS(status)) {
-        WdfRequestComplete(Request, status);
-        return;
-    }
+    WdfRequestFormatRequestUsingCurrentType(Request);
 
     WdfRequestSetCompletionRoutine(Request, CycloneEvtReadComplete, Device);
 
@@ -132,11 +128,7 @@ static VOID CycloneForwardAndForget(_In_ WDFDEVICE Device, _In_ WDFREQUEST Reque
     WDF_REQUEST_SEND_OPTIONS options;
     NTSTATUS status;
 
-    status = WdfRequestFormatRequestUsingCurrentType(Request);
-    if (!NT_SUCCESS(status)) {
-        WdfRequestComplete(Request, status);
-        return;
-    }
+    WdfRequestFormatRequestUsingCurrentType(Request);
 
     WDF_REQUEST_SEND_OPTIONS_INIT(&options, WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET);
 
