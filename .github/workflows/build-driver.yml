@@ -52,14 +52,31 @@ jobs:
       - name: Install WDK Visual Studio extension
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $enginePath = & $vswhere -nologo -latest -products * -property enginePath
-          $vsixInstaller = Join-Path $enginePath "VSIXInstaller.exe"
+          $installPath = & $vswhere -nologo -latest -products * -property installationPath
+          if (-not $installPath) {
+            throw "Could not locate Visual Studio installation via vswhere."
+          }
+
+          # VSIXInstaller.exe lives under the VS install, not the installer enginePath.
+          $vsixInstaller = Join-Path $installPath "Common7\IDE\VSIXInstaller.exe"
+          if (-not (Test-Path $vsixInstaller)) {
+            throw "VSIXInstaller.exe not found at $vsixInstaller"
+          }
+
           $wdkVsix = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Vsix" -Recurse -Filter "WDK.vsix" | Select-Object -First 1
           if (-not $wdkVsix) {
             throw "Could not find WDK.vsix after WDK install."
           }
-          & $vsixInstaller /quiet $wdkVsix.FullName
+
+          Write-Host "Installing $($wdkVsix.FullName) with $vsixInstaller"
+          $p = Start-Process -FilePath $vsixInstaller -ArgumentList "/quiet", "/admin", $wdkVsix.FullName -Wait -PassThru
+          # 0 = installed, 1001 = already installed
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 1001) {
+            throw "VSIXInstaller exited with $($p.ExitCode)"
+          }
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
