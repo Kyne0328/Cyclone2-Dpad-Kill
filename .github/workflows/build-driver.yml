@@ -30,9 +30,24 @@ jobs:
       - name: Install Windows SDK and WDK
         shell: pwsh
         run: |
-          winget source update
-          winget install --id Microsoft.WindowsSDK.10.0.28000 --exact --silent --accept-package-agreements --accept-source-agreements
-          winget install --id Microsoft.WindowsWDK.10.0.28000 --exact --silent --accept-package-agreements --accept-source-agreements
+          $ErrorActionPreference = "Stop"
+
+          function Install-FromFwLink {
+            param([string]$Name, [string]$Url, [string]$File)
+            Write-Host "Downloading $Name..."
+            Invoke-WebRequest -Uri $Url -OutFile $File -UseBasicParsing
+            Write-Host "Installing $Name..."
+            $p = Start-Process -FilePath $File -ArgumentList "/quiet", "/norestart" -Wait -PassThru
+            # 0 = success, 3010 = success but reboot required
+            if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
+              throw "$Name installer exited with $($p.ExitCode)"
+            }
+          }
+
+          # Windows 11, version 24H2 SDK + WDK (10.0.26100). The WDK must match
+          # the SDK version. fwlinks are stable Microsoft download redirects.
+          Install-FromFwLink "Windows 11 SDK 26100" "https://go.microsoft.com/fwlink/?linkid=2272610" "winsdksetup.exe"
+          Install-FromFwLink "Windows 11 WDK 26100" "https://go.microsoft.com/fwlink/?linkid=2272234" "wdksetup.exe"
 
       - name: Install WDK Visual Studio extension
         shell: pwsh
