@@ -12,9 +12,9 @@ DriverVer=06/06/2026,0.1.0.0
 PnpLockdown=1
 
 [Manufacturer]
-%ManufacturerName%=Standard,NTamd64
+%ManufacturerName%=Standard,NTamd64.10.0...16299
 
-[Standard.NTamd64]
+[Standard.NTamd64.10.0...16299]
 ; Replace this placeholder with the Cyclone 2 HID hardware ID from Device Manager.
 %Cyclone2DeviceDesc%=Cyclone2DpadFilter_Install,HID\VID_XXXX&PID_YYYY
 
@@ -35,10 +35,13 @@ CopyFiles=Cyclone2DpadFilter_CopyFiles
 Cyclone2DpadFilter.sys
 
 [Cyclone2DpadFilter_Install.NT.HW]
-AddReg=Cyclone2DpadFilter_AddReg,Cyclone2DpadFilter_Settings
+AddReg=Cyclone2DpadFilter_Settings
 
-[Cyclone2DpadFilter_AddReg]
-HKR,,"UpperFilters",0x00010008,"Cyclone2DpadFilter"
+[Cyclone2DpadFilter_Install.NT.Filters]
+AddFilter=Cyclone2DpadFilter,,Cyclone2DpadFilter_FilterInstall
+
+[Cyclone2DpadFilter_FilterInstall]
+FilterPosition=Upper
 
 [Cyclone2DpadFilter_Settings]
 HKR,,"ReportId",0x00010001,0x00000000
@@ -55,6 +58,12 @@ ServiceType=1
 StartType=3
 ErrorControl=1
 ServiceBinary=%13%\Cyclone2DpadFilter.sys
+
+[Cyclone2DpadFilter_Install.NT.Wdf]
+KmdfService=Cyclone2DpadFilter,Cyclone2DpadFilter_WdfSect
+
+[Cyclone2DpadFilter_WdfSect]
+KmdfLibraryVersion=$KMDFVERSION$
 
 [Strings]
 ProviderName="Local"

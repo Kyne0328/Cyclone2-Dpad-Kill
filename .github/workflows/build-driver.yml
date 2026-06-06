@@ -110,8 +110,8 @@ jobs:
           # avoids picking up the source .inf at the repo root, and
           # if-no-files-found:error fails the job if the build produced nothing.
           path: |
-            x64\${{ matrix.configuration }}\*.sys
-            x64\${{ matrix.configuration }}\*.inf
-            x64\${{ matrix.configuration }}\*.cat
-            x64\${{ matrix.configuration }}\*.pdb
+            x64\${{ matrix.configuration }}\**\*.sys
+            x64\${{ matrix.configuration }}\**\*.inf
+            x64\${{ matrix.configuration }}\**\*.cat
+            x64\${{ matrix.configuration }}\**\*.pdb
           if-no-files-found: error
