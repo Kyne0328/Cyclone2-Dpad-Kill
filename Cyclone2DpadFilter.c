@@ -81,9 +81,9 @@ static VOID CycloneFilterDpadReport(
         return;
     }
 
-    Report[Context->DpadByteOffset] =
+    Report[Context->DpadByteOffset] = (UCHAR)(
         (Report[Context->DpadByteOffset] & ~Context->DpadMask) |
-        (Context->DpadNeutralValue & Context->DpadMask);
+        (Context->DpadNeutralValue & Context->DpadMask));
 }
 
 NTSTATUS DriverEntry(
