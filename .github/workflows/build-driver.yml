@@ -71,15 +71,30 @@ jobs:
 
       - name: Build driver
         shell: cmd
+        timeout-minutes: 30
         run: |
-          call %EWDK_DRIVE%:\LaunchBuildEnv.cmd msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }}
+          rem LaunchBuildEnv.cmd sets up the build environment and returns; it
+          rem does not accept a build command as an argument. Set up the env,
+          rem then run msbuild as a separate command in the same cmd session.
+          call "%EWDK_DRIVE%:\LaunchBuildEnv.cmd"
+          msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /v:minimal
+          if errorlevel 1 (
+            echo msbuild failed
+            exit /b 1
+          )
+          echo === Build output ===
+          dir /s /b "%GITHUB_WORKSPACE%\x64"
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
           name: Cyclone2DpadFilter-${{ matrix.configuration }}-${{ matrix.platform }}
+          # Build output dir is <project>\x64\<Configuration>\. Targeting it
+          # avoids picking up the source .inf at the repo root, and
+          # if-no-files-found:error fails the job if the build produced nothing.
           path: |
-            **\*.sys
-            **\*.inf
-            **\*.cat
-            **\*.pdb
+            x64\${{ matrix.configuration }}\*.sys
+            x64\${{ matrix.configuration }}\*.inf
+            x64\${{ matrix.configuration }}\*.cat
+            x64\${{ matrix.configuration }}\*.pdb
+          if-no-files-found: error
