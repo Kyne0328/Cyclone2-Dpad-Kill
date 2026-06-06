@@ -44,10 +44,13 @@ jobs:
             }
           }
 
-          # Windows 11, version 24H2 SDK + WDK (10.0.26100). The WDK must match
-          # the SDK version. fwlinks are stable Microsoft download redirects.
-          Install-FromFwLink "Windows 11 SDK 26100" "https://go.microsoft.com/fwlink/?linkid=2272610" "winsdksetup.exe"
-          Install-FromFwLink "Windows 11 WDK 26100" "https://go.microsoft.com/fwlink/?linkid=2272234" "wdksetup.exe"
+          # SDK + WDK build 10.0.26100.6584 — the pair Microsoft documents for
+          # Visual Studio 2022 (the edition on the windows-2022 runner). The WDK
+          # VSIX in this build targets VS2022, so it integrates correctly. The
+          # "latest" WDK targets VS2026 and its VSIX won't apply to VS2022.
+          # SDK and WDK build numbers must match.
+          Install-FromFwLink "Windows 11 SDK 26100.6584" "https://go.microsoft.com/fwlink/?linkid=2338977" "winsdksetup.exe"
+          Install-FromFwLink "Windows 11 WDK 26100.6584" "https://go.microsoft.com/fwlink/?linkid=2335869" "wdksetup.exe"
 
       - name: Install WDK Visual Studio extension
         shell: pwsh
@@ -66,17 +69,21 @@ jobs:
             throw "VSIXInstaller.exe not found at $vsixInstaller"
           }
 
-          $wdkVsix = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Vsix" -Recurse -Filter "WDK.vsix" | Select-Object -First 1
+          $allVsix = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Vsix" -Recurse -Filter "WDK.vsix"
+          # Prefer the VS2022 / amd64 extension to match the runner's VS edition.
+          $wdkVsix = $allVsix | Where-Object { $_.FullName -match 'VS2022' -and $_.FullName -match 'amd64' } | Select-Object -First 1
+          if (-not $wdkVsix) {
+            $wdkVsix = $allVsix | Select-Object -First 1
+          }
           if (-not $wdkVsix) {
             throw "Could not find WDK.vsix after WDK install."
           }
 
           Write-Host "Installing $($wdkVsix.FullName) with $vsixInstaller"
           $p = Start-Process -FilePath $vsixInstaller -ArgumentList "/quiet", "/admin", $wdkVsix.FullName -Wait -PassThru
-          # 0 = installed, 1001 / 2001 = already installed (WDK setup may have
-          # integrated the extension into VS already). msbuild fails later if the
-          # KMDF toolset is genuinely missing, so benign "already installed" is ok.
-          if ($p.ExitCode -notin @(0, 1001, 2001)) {
+          # 0 = installed, 1001 = already installed. 2001 means no applicable VS
+          # product (version mismatch) and is a real failure for this build.
+          if ($p.ExitCode -notin @(0, 1001)) {
             throw "VSIXInstaller exited with $($p.ExitCode)"
           }
           Write-Host "VSIXInstaller exit code: $($p.ExitCode)"
