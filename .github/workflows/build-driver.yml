@@ -96,13 +96,39 @@ jobs:
             exit /b 1
           )
 
-          msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:WindowsTargetPlatformVersion=%WINSDKVER% /v:minimal
+          rem Build the driver only. The WDK auto-packaging copies the .inf into
+          rem a package subfolder but not the .sys (a known limitation of a lone
+          rem driver project without a companion Package project), which makes
+          rem the built-in inf2cat/signability fail. Disable signing and the
+          rem built-in inf2cat here; we assemble the package and catalog below.
+          msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:WindowsTargetPlatformVersion=%WINSDKVER% /p:SignMode=Off /p:EnableInf2Cat=false /v:minimal
           set "RC=%ERRORLEVEL%"
 
           echo === Build output tree (x64) ===
           dir /s /b "%GITHUB_WORKSPACE%\x64" 2>nul
 
           if not "%RC%"=="0" ( echo msbuild failed with %RC% & exit /b %RC% )
+
+          rem Assemble a clean package dir with just the inf + sys so inf2cat
+          rem finds the binary next to the inf, then generate the catalog.
+          set "OUT=%GITHUB_WORKSPACE%\x64\${{ matrix.configuration }}"
+          set "PKG=%GITHUB_WORKSPACE%\package"
+          if exist "%PKG%" rmdir /s /q "%PKG%"
+          mkdir "%PKG%"
+          copy /y "%OUT%\Cyclone2DpadFilter.sys" "%PKG%\" >nul
+          copy /y "%OUT%\Cyclone2DpadFilter.inf" "%PKG%\" >nul
+
+          set "INF2CAT=%EWDK_DRIVE%:\Program Files\Windows Kits\10\bin\%WINSDKVER%\x86\inf2cat.exe"
+          if not exist "%INF2CAT%" set "INF2CAT=inf2cat.exe"
+          echo Using INF2CAT=%INF2CAT%
+          "%INF2CAT%" /driver:"%PKG%" /os:10_19H1_X64
+          if errorlevel 1 echo (warning) inf2cat did not produce a catalog; shipping .sys and .inf only
+
+          rem Copy symbols after cataloging so they are not part of the package.
+          copy /y "%OUT%\Cyclone2DpadFilter.pdb" "%PKG%\" >nul
+
+          echo === Package dir ===
+          dir /b "%PKG%"
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
@@ -112,8 +138,8 @@ jobs:
           # avoids picking up the source .inf at the repo root, and
           # if-no-files-found:error fails the job if the build produced nothing.
           path: |
-            x64\${{ matrix.configuration }}\**\*.sys
-            x64\${{ matrix.configuration }}\**\*.inf
-            x64\${{ matrix.configuration }}\**\*.cat
-            x64\${{ matrix.configuration }}\**\*.pdb
+            package\*.sys
+            package\*.inf
+            package\*.cat
+            package\*.pdb
           if-no-files-found: error
