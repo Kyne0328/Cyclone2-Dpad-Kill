@@ -78,13 +78,22 @@ jobs:
           rem then run msbuild as a separate command in the same cmd session.
           call "%EWDK_DRIVE%:\LaunchBuildEnv.cmd"
 
-          rem The EWDK dev prompt does not put msbuild on PATH; resolve its full
-          rem path from the VS install it sets up, with a search fallback.
-          echo VSINSTALLDIR=%VSINSTALLDIR%
-          set "MSBUILD=%VSINSTALLDIR%MSBuild\Current\Bin\MSBuild.exe"
-          if not exist "%MSBUILD%" (
-            echo MSBuild not at expected path, searching under Program Files...
-            for /r "%EWDK_DRIVE%:\Program Files" %%f in (MSBuild.exe) do set "MSBUILD=%%f"
+          rem The EWDK dev prompt does not put msbuild on PATH or set
+          rem VSINSTALLDIR. Resolve MSBuild from the EWDK's Build Tools install,
+          rem falling back to a search restricted to the Visual Studio dir (a
+          rem search over all of Program Files matches a bogus NETFXSDK stub).
+          set "MSBUILD="
+          set "VSROOT=%EWDK_DRIVE%:\Program Files\Microsoft Visual Studio\2022\BuildTools"
+          if exist "%VSROOT%\MSBuild\Current\Bin\amd64\MSBuild.exe" set "MSBUILD=%VSROOT%\MSBuild\Current\Bin\amd64\MSBuild.exe"
+          if not defined MSBUILD if exist "%VSROOT%\MSBuild\Current\Bin\MSBuild.exe" set "MSBUILD=%VSROOT%\MSBuild\Current\Bin\MSBuild.exe"
+          if not defined MSBUILD (
+            echo MSBuild not at expected path, searching under Visual Studio dir...
+            for /r "%EWDK_DRIVE%:\Program Files\Microsoft Visual Studio" %%f in (MSBuild.exe) do set "MSBUILD=%%f"
+          )
+          if not defined MSBUILD (
+            echo Could not locate MSBuild.exe under the EWDK.
+            dir /b "%EWDK_DRIVE%:\Program Files\Microsoft Visual Studio\2022"
+            exit /b 1
           )
           echo Using MSBUILD=%MSBUILD%
 
