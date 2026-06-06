@@ -69,27 +69,24 @@ jobs:
           "EWDK_DRIVE=$drive" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "EWDK mounted at ${drive}:"
 
-      # DIAGNOSTIC ONLY: reveal how the EWDK sets up its environment so the
-      # build can call the in-process setup script(s) directly, instead of
-      # LaunchBuildEnv.cmd which configures the env inside a spawned child shell
-      # (env is then lost to later commands). Remove once the build is fixed.
-      - name: Inspect EWDK environment setup
+      - name: Build driver
         shell: cmd
+        timeout-minutes: 30
         run: |
-          echo ===== ISO ROOT =====
-          dir /b "%EWDK_DRIVE%:\"
-          echo.
-          echo ===== *.cmd in ISO ROOT =====
-          dir /b "%EWDK_DRIVE%:\*.cmd"
-          echo.
-          echo ===== BuildEnv folder =====
-          dir /b "%EWDK_DRIVE%:\BuildEnv" 2>nul
-          echo.
-          echo ===== LaunchBuildEnv.cmd CONTENTS =====
-          type "%EWDK_DRIVE%:\LaunchBuildEnv.cmd"
-          echo.
-          echo ===== END =====
-          exit /b 1
+          rem Set up the EWDK build environment IN-PROCESS. LaunchBuildEnv.cmd
+          rem just runs "%comspec% /k BuildEnv\SetupBuildEnv.cmd", i.e. it
+          rem configures the env inside a spawned child shell, so that env would
+          rem be lost to later commands. Call SetupBuildEnv.cmd directly so the
+          rem full VS/MSVC/WDK env (PATH incl. msbuild, VSINSTALLDIR,
+          rem VCToolsInstallDir, VCTargetsPath, ...) persists for the build.
+          call "%EWDK_DRIVE%:\BuildEnv\SetupBuildEnv.cmd"
+          if errorlevel 1 ( echo SetupBuildEnv failed & exit /b 1 )
+
+          msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /v:minimal
+          if errorlevel 1 ( echo msbuild failed & exit /b 1 )
+
+          echo === Build output ===
+          dir /s /b "%GITHUB_WORKSPACE%\x64"
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
