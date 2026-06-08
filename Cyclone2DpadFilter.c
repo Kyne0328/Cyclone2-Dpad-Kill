@@ -67,36 +67,19 @@ static VOID CycloneFilterDpadReport(
     _In_ size_t Length
     )
 {
-    ULONG offsets[2];
-    ULONG i;
+    UNREFERENCED_PARAMETER(Context);
 
-    if (Context->DpadMask == 0) {
-        return;
+    //
+    // Diagnostic build: ignore registry settings and force the observed D-pad
+    // bytes to neutral. This proves whether this filter can modify the actual
+    // report buffer that hidapi/GameSir Connect receives.
+    //
+    if (Length > 11) {
+        Report[11] = 0x00;
     }
 
-    if (Context->ReportId != 0) {
-        if (Length == 0 || Report[0] != (UCHAR)(Context->ReportId & 0xFF)) {
-            return;
-        }
-    }
-
-    if (Context->DpadByteOffset >= Length) {
-        return;
-    }
-
-    offsets[0] = Context->DpadByteOffset;
-    offsets[1] = Context->DpadByteOffset + 1;
-
-    for (i = 0; i < RTL_NUMBER_OF(offsets); i++) {
-        ULONG offset = offsets[i];
-
-        if (offset >= Length) {
-            continue;
-        }
-
-        Report[offset] = (UCHAR)(
-            (Report[offset] & ~Context->DpadMask) |
-            (Context->DpadNeutralValue & Context->DpadMask));
+    if (Length > 12) {
+        Report[12] = 0x00;
     }
 }
 
