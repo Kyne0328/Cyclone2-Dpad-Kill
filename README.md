@@ -13,6 +13,14 @@ The model section is decorated as `NTamd64.10.0...18362` because:
 
 So the effective minimum install target is Windows 10 version 1903 / build 18362 or newer.
 
+The current Cyclone 2 USB game-controller target is:
+
+```inf
+HID\VID_3537&PID_100B&IG_01
+```
+
+This is the HID game-controller child device, not the USB composite/Xbox interface parent. The earlier `USB\VID_3537&PID_100B&MI_00` target installs on the XnaComposite/Xbox 360 interface and does not intercept the HID input report stream used by this filter.
+
 ## Build
 
 Use the GitHub Actions workflow or build locally with Visual Studio + WDK/EWDK.
@@ -28,24 +36,16 @@ Expected package files after a successful GitHub Actions build:
 
 The workflow creates a temporary self-signed test code-signing certificate, signs the catalog file, verifies the signature, and exports the public certificate into the artifact.
 
-## Before install
+## D-pad report settings
 
-Replace the placeholder hardware ID in `Cyclone2DpadFilter.inf`:
-
-```inf
-HID\VID_XXXX&PID_YYYY
-```
-
-with the actual Cyclone 2 HID hardware ID from Device Manager.
-
-After editing the INF, rebuild. Do not edit the INF inside a built artifact, because that invalidates the catalog signature.
-
-The default D-pad report settings are still guesses until the real controller HID report layout is known:
+The current USB HID report values are:
 
 - `ReportId=0`
-- `DpadByteOffset=2`
-- `DpadMask=0x0F`
-- `DpadNeutralValue=0x08`
+- `DpadByteOffset=0x0B`
+- `DpadMask=0x1C`
+- `DpadNeutralValue=0x00`
+
+These were derived from reports where byte 11 changed between `00`, `04`, `0C`, `14`, and `1C` during D-pad presses.
 
 ## Install notes
 
@@ -58,10 +58,13 @@ bcdedit /set testsigning on
 shutdown /r /t 0
 ```
 
-After reboot, import the exported test certificate into the local machine Trusted Root store:
+If Secure Boot blocks that command, temporarily disable Secure Boot in BIOS/UEFI first.
+
+After reboot, import the exported test certificate into the local machine Trusted Root and Trusted Publisher stores:
 
 ```cmd
 certutil -addstore -f Root Cyclone2DpadFilter-TestCert.cer
+certutil -addstore -f TrustedPublisher Cyclone2DpadFilter-TestCert.cer
 ```
 
 Then install from an elevated Command Prompt in the artifact folder:
@@ -70,7 +73,7 @@ Then install from an elevated Command Prompt in the artifact folder:
 pnputil /add-driver Cyclone2DpadFilter.inf /install
 ```
 
-Unplug and replug the controller, or disable and re-enable it in Device Manager.
+Unplug and replug the controller, or disable and re-enable the HID-compliant game controller in Device Manager.
 
 ## Uninstall
 
@@ -90,6 +93,7 @@ Remove the test certificate if you no longer need it:
 
 ```cmd
 certutil -delstore Root "Cyclone2DpadFilter Test Certificate"
+certutil -delstore TrustedPublisher "Cyclone2DpadFilter Test Certificate"
 ```
 
 Turn off test-signing:
@@ -99,4 +103,4 @@ bcdedit /set testsigning off
 shutdown /r /t 0
 ```
 
-Reboot afterward.
+Re-enable Secure Boot afterward if you disabled it.
