@@ -16,7 +16,7 @@ PnpLockdown=1
 
 [Standard.NTamd64.10.0...18362]
 ; Replace this placeholder with the Cyclone 2 HID hardware ID from Device Manager.
-%Cyclone2DeviceDesc%=Cyclone2DpadFilter_Install,HID\VID_XXXX&PID_YYYY
+%Cyclone2DeviceDesc%=Cyclone2DpadFilter_Install,USB\VID_3537&PID_100B&MI_00
 
 [SourceDisksNames]
 1=%DiskName%,,,
@@ -45,9 +45,9 @@ FilterPosition=Upper
 
 [Cyclone2DpadFilter_Settings]
 HKR,,"ReportId",0x00010001,0x00000000
-HKR,,"DpadByteOffset",0x00010001,0x00000002
-HKR,,"DpadMask",0x00010001,0x0000000F
-HKR,,"DpadNeutralValue",0x00010001,0x00000008
+HKR,,"DpadByteOffset",0x00010001,0x0000000B
+HKR,,"DpadMask",0x00010001,0x0000001C
+HKR,,"DpadNeutralValue",0x00010001,0x00000000
 
 [Cyclone2DpadFilter_Install.NT.Services]
 AddService=Cyclone2DpadFilter,,Cyclone2DpadFilter_Service
