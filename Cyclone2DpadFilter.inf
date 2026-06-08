@@ -18,6 +18,7 @@ PnpLockdown=1
 ; Replace this placeholder with the Cyclone 2 HID hardware ID from Device Manager.
 %Cyclone2DeviceDesc_IG00%=Cyclone2DpadFilter_Install,HID\VID_3537&PID_100B&IG_00
 %Cyclone2DeviceDesc_IG01%=Cyclone2DpadFilter_Install,HID\VID_3537&PID_100B&IG_01
+%Cyclone2DeviceDesc_IG02%=Cyclone2DpadFilter_Install,HID\VID_3537&PID_100B&IG_02
 
 [SourceDisksNames]
 1=%DiskName%,,,
@@ -71,5 +72,6 @@ ProviderName="Local"
 ManufacturerName="GameSir Filter"
 Cyclone2DeviceDesc_IG00="GameSir Cyclone 2 D-pad Filter IG_00"
 Cyclone2DeviceDesc_IG01="GameSir Cyclone 2 D-pad Filter IG_01"
+Cyclone2DeviceDesc_IG02="GameSir Cyclone 2 D-pad Filter IG_02"
 ServiceName="Cyclone2DpadFilter"
 DiskName="Cyclone2DpadFilter Installation Disk"
