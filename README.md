@@ -2,6 +2,14 @@
 
 Windows KMDF HID upper-filter driver scaffold for GameSir Cyclone 2 D-pad filtering.
 
+> **Covering XInput and the GameSir Connect app:** this HID upper filter only
+> sits on the DirectInput HID path (`IG_01`). Most games read **XInput**
+> (`xusb22`, `MI_00`), which this filter never touches. To neutralize the D-pad
+> across every consumer at once -- XInput games, DirectInput apps, and the
+> GameSir Connect config app -- see the USB lower filter in
+> [Cyclone2UsbFilter.md](Cyclone2UsbFilter.md), which attaches at the USB
+> composite parent.
+
 ## Current INF target
 
 The INF is an Extension INF, not a primary HIDClass device INF. It adds the filter above the existing in-box HID function driver.

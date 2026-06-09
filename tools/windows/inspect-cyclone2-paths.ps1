@@ -32,6 +32,14 @@ function Show-Device {
             Write-Host "  $filter"
         }
     }
+
+    $lowerFilters = Get-PnpDeviceProperty -InstanceId $Device.InstanceId -KeyName "DEVPKEY_Device_LowerFilters" -ErrorAction SilentlyContinue
+    if ($lowerFilters -and $lowerFilters.Data) {
+        Write-Host "LowerFilters:"
+        foreach ($filter in $lowerFilters.Data) {
+            Write-Host "  $filter"
+        }
+    }
 }
 
 Write-Host "Connected GameSir / Cyclone / XInput-ish devices"

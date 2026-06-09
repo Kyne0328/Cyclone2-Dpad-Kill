@@ -1,0 +1,69 @@
+[Version]
+Signature="$WINDOWS NT$"
+; Extension INF: USB *lower* filter on the Cyclone 2 USB composite parent
+; (USB\VID_3537&PID_100B, service usbccgp). Sits below usbccgp so it sees the
+; URBs of every child interface -- MI_00 (xusb22/XInput), MI_01 (vendor/GameSir
+; Connect), IG_01 (HID/DirectInput) -- and neutralizes the D-pad in each.
+Class=Extension
+ClassGuid={e2f84ce7-8efa-411c-aa69-97454ca4cb57}
+ExtensionId={6b1f7d3a-2c84-4e51-9af2-3d7c8b6a1e95}
+Provider=%ProviderName%
+CatalogFile=Cyclone2UsbFilter.cat
+DriverVer=06/09/2026,0.1.0.0
+PnpLockdown=1
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64.10.0...18362
+
+[Standard.NTamd64.10.0...18362]
+%Cyclone2UsbDesc%=Cyclone2UsbFilter_Install,USB\VID_3537&PID_100B
+
+[SourceDisksNames]
+1=%DiskName%,,,
+
+[SourceDisksFiles]
+Cyclone2UsbFilter.sys=1
+
+[DestinationDirs]
+Cyclone2UsbFilter_CopyFiles=13
+
+[Cyclone2UsbFilter_Install.NT]
+CopyFiles=Cyclone2UsbFilter_CopyFiles
+
+[Cyclone2UsbFilter_CopyFiles]
+Cyclone2UsbFilter.sys
+
+[Cyclone2UsbFilter_Install.NT.HW]
+AddReg=Cyclone2UsbFilter_LowerFilter
+
+[Cyclone2UsbFilter_LowerFilter]
+HKR,,"LowerFilters",0x00010008,"Cyclone2UsbFilter"
+
+[Cyclone2UsbFilter_Install.NT.Filters]
+AddFilter=Cyclone2UsbFilter,,Cyclone2UsbFilter_FilterInstall
+
+[Cyclone2UsbFilter_FilterInstall]
+FilterPosition=Lower
+
+[Cyclone2UsbFilter_Install.NT.Services]
+AddService=Cyclone2UsbFilter,,Cyclone2UsbFilter_Service
+
+[Cyclone2UsbFilter_Service]
+DisplayName=%ServiceName%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\Cyclone2UsbFilter.sys
+
+[Cyclone2UsbFilter_Install.NT.Wdf]
+KmdfService=Cyclone2UsbFilter,Cyclone2UsbFilter_WdfSect
+
+[Cyclone2UsbFilter_WdfSect]
+KmdfLibraryVersion=$KMDFVERSION$
+
+[Strings]
+ProviderName="Local"
+ManufacturerName="GameSir Filter"
+Cyclone2UsbDesc="GameSir Cyclone 2 USB D-pad Filter (composite parent)"
+ServiceName="Cyclone2UsbFilter"
+DiskName="Cyclone2UsbFilter Installation Disk"

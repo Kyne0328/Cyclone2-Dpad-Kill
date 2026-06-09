@@ -134,13 +134,13 @@ static BOOLEAN CycloneTryGetReportBuffer(
             *Buffer = (PUCHAR)packet->reportBuffer;
             *Length = packet->reportBufferLen;
 
-            if (CompletedLength != 0 && CompletedLength < *Length) {
-                *Length = CompletedLength;
+            if (BytesReturned != 0 && BytesReturned < *Length) {
+                *Length = BytesReturned;
             }
 
             KdPrint(("CycloneFilter: using HID_XFER_PACKET ReportBuffer len=%Iu completed=%Iu\n",
                      *Length,
-                     CompletedLength));
+                     BytesReturned));
             return TRUE;
         }
     }
