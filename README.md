@@ -10,15 +10,20 @@ Connect is an Electron app that reads the controller directly through
 `node-hid` (`HID.node`), so neither an XInput shim nor a HID/USB driver filter
 reaches its input path — but the JavaScript layer does.
 
-## Why node-hid
+## Why node-hid (and why the *unpacked* copy)
 
 GameSir Connect bundles:
 
 ```
-resources\app.asar              <- the JS app (where node-hid is required)
-resources\app.asar.unpacked\... <- native modules incl. node-hid HID.node
-node_modules\node-hid, ffi-napi, ref-napi
+resources\app.asar              <- packed JS
+resources\app.asar.unpacked\node_modules\node-hid\nodehid.js  <- the copy actually loaded
 ```
+
+`node-hid` is a **native** module, so Electron unpacks the entire node-hid
+folder to `app.asar.unpacked` and `require('node-hid')` loads `nodehid.js` from
+**there** at runtime. The copy inside `app.asar` is ignored. So the patch
+appends the neutralizer directly to the **unpacked** `nodehid.js` — no asar
+extract/repack needed in the normal case.
 
 Wrapping the `node-hid` `HID` class is a single chokepoint: every `'data'`
 event, `read()/readSync()/readTimeout()`, and `getFeatureReport()` runs through
@@ -27,7 +32,7 @@ our scrub, so we never have to find every UI call site.
 ## What it changes
 
 [tools/gamesir-connect/dpad-neutralizer.js](tools/gamesir-connect/dpad-neutralizer.js)
-is appended to node-hid's main module. It forces the D-pad to neutral:
+is appended to the unpacked `nodehid.js`. It forces the D-pad to neutral:
 
 ```js
 // Vendor report (USB endpoint 0x84): report id 0x12, 64 bytes.
@@ -42,8 +47,9 @@ run the patch with `-Log` to confirm the real offset (see below).
 
 ## Requirements
 
-- Node.js (for `npx @electron/asar`). The scripts call `npx --yes @electron/asar`,
-  so no global install is needed.
+- Normal case (node-hid unpacked): **none** — direct file edit, no Node needed.
+- Fallback case (node-hid packed inside app.asar): Node.js, for
+  `npx @electron/asar` repack.
 
 ## Patch
 
@@ -51,10 +57,9 @@ run the patch with `-Log` to confirm the real offset (see below).
 powershell -ExecutionPolicy Bypass -File .\tools\gamesir-connect\patch-gamesir-connect.ps1
 ```
 
-This stops GameSir Connect, backs up `app.asar` -> `app.asar.bak` (first run
-only), then always rebuilds from that pristine backup (so re-running never
-double-applies), extracts, injects the neutralizer into node-hid, and repacks
-with native `*.node` modules kept unpacked.
+Stops GameSir Connect, saves the original `nodehid.js` as `nodehid.js.cyclonebak`
+(first run only), restores from it before re-appending (so re-running never
+double-applies), then appends the neutralizer to the unpacked `nodehid.js`.
 
 Launch GameSir Connect and test: D-pad reads neutral, everything else normal.
 

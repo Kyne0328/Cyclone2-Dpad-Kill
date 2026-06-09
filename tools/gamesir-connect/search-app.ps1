@@ -14,7 +14,7 @@ $out  = Join-Path ([Environment]::GetFolderPath("Desktop")) "gamesir_search_hits
 if (-not (Test-Path $asar)) { throw "app.asar not found: $asar" }
 
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
-npx --yes @electron/asar extract "$asar" "$work"
+npx --yes @electron/asar@3.2.10 extract "$asar" "$work"
 
 $patterns = @(
     "node-hid", "HID.devices", "new HID", "\.read\(", "on\(['""]data",

@@ -43,12 +43,14 @@
 
         logReport(data);
 
-        // Vendor report seen on USB endpoint 0x84 (USBPcap ground truth):
-        // report id 0x12, 64 bytes, D-pad hat at byte[5] and its firmware
-        // mirror at byte[58]; 0x0F = neutral.
+        // Vendor report (report id 0x12, 64 bytes). The D-pad hat sits in the
+        // LOW nibble of byte[5] and byte[58]; 0x0F = neutral, directions = 0..7.
+        // byte[58]'s HIGH nibble carries the face buttons (A/B/X/Y), so we OR in
+        // 0x0F to force only the hat to neutral and leave everything else alone
+        // (overwriting the whole byte would wipe ABXY).
         if (data.length >= 59 && data[0] === 0x12) {
-            data[5] = 0x0f;
-            data[58] = 0x0f;
+            data[5] = data[5] | 0x0f;
+            data[58] = data[58] | 0x0f;
             return data;
         }
 
