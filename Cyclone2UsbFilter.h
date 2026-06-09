@@ -5,6 +5,7 @@
 #include <wdf.h>
 #include <usb.h>
 #include <usbdlib.h>
+#include <usbioctl.h>
 #include <wdfusb.h>
 
 //

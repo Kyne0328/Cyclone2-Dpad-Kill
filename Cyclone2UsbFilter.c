@@ -243,7 +243,7 @@ VOID CycloneUsbEvtIoInternalDeviceControl(
     // URB rides in the WDM IRP stack location, not the WDF buffers, so reach
     // through to the IRP to read it.
     //
-    if (IoControlCode == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+    if (IoControlCode == (ULONG)IOCTL_INTERNAL_USB_SUBMIT_URB) {
         PIRP irp = WdfRequestWdmGetIrp(Request);
         PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(irp);
         PURB urb = (PURB)stack->Parameters.Others.Argument1;
