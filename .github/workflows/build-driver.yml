@@ -1,4 +1,4 @@
-name: Build Cyclone2DpadFilter
+name: Build Cyclone2 Filters
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "Cyclone2DpadFilter.*"
+      - "Cyclone2UsbFilter.*"
       - ".github/workflows/build-driver.yml"
 
 jobs:
@@ -69,7 +70,7 @@ jobs:
           "EWDK_DRIVE=$drive" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "EWDK mounted at ${drive}:"
 
-      - name: Build, catalog, and test-sign driver package
+      - name: Build, catalog, and test-sign driver packages
         shell: cmd
         timeout-minutes: 30
         run: |
@@ -87,18 +88,39 @@ jobs:
             exit /b 1
           )
 
-          rem Build the driver binary. We generate the package catalog manually
-          rem below, then test-sign that catalog.
-          msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:WindowsTargetPlatformVersion=%WINSDKVER% /p:SignMode=Off /p:EnableInf2Cat=false /v:minimal
-          set "RC=%ERRORLEVEL%"
+          set "INF2CAT=%EWDK_DRIVE%:\Program Files\Windows Kits\10\bin\%WINSDKVER%\x86\inf2cat.exe"
+          if not exist "%INF2CAT%" set "INF2CAT=inf2cat.exe"
+          set "SIGNTOOL=%EWDK_DRIVE%:\Program Files\Windows Kits\10\bin\%WINSDKVER%\x64\signtool.exe"
+          if not exist "%SIGNTOOL%" set "SIGNTOOL=signtool.exe"
+          echo Using INF2CAT=%INF2CAT%
+          echo Using SIGNTOOL=%SIGNTOOL%
 
-          echo === Build output tree (x64) ===
+          rem ---------------------------------------------------------------
+          rem Build both drivers.
+          rem ---------------------------------------------------------------
+          msbuild "%GITHUB_WORKSPACE%\Cyclone2DpadFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:WindowsTargetPlatformVersion=%WINSDKVER% /p:SignMode=Off /p:EnableInf2Cat=false /v:minimal
+          if errorlevel 1 ( echo msbuild Cyclone2DpadFilter failed & exit /b 1 )
+
+          msbuild "%GITHUB_WORKSPACE%\Cyclone2UsbFilter.vcxproj" /t:Clean,Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:WindowsTargetPlatformVersion=%WINSDKVER% /p:SignMode=Off /p:EnableInf2Cat=false /v:minimal
+          if errorlevel 1 ( echo msbuild Cyclone2UsbFilter failed & exit /b 1 )
+
+          echo === Build output tree ===
           dir /s /b "%GITHUB_WORKSPACE%\x64" 2>nul
 
-          if not "%RC%"=="0" ( echo msbuild failed with %RC% & exit /b %RC% )
+          rem ---------------------------------------------------------------
+          rem Create one shared test certificate for both packages.
+          rem ---------------------------------------------------------------
+          set "CERTFILE=%GITHUB_WORKSPACE%\Cyclone2-TestCert.cer"
+          set "THUMBFILE=%GITHUB_WORKSPACE%\Cyclone2-TestCert-Thumbprint.txt"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Cyclone2 Filter Test Certificate' -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(3); Export-Certificate -Cert $cert -FilePath '%CERTFILE%' | Out-Null; Import-Certificate -FilePath '%CERTFILE%' -CertStoreLocation 'Cert:\LocalMachine\Root' | Out-Null; Import-Certificate -FilePath '%CERTFILE%' -CertStoreLocation 'Cert:\LocalMachine\TrustedPublisher' | Out-Null; Set-Content -Path '%THUMBFILE%' -Value $cert.Thumbprint"
+          if errorlevel 1 ( echo certificate creation failed & exit /b 1 )
 
-          rem Assemble a clean package dir with just the files that belong in
-          rem the install package. inf2cat hashes everything in this directory.
+          for /f "usebackq delims=" %%T in ("%THUMBFILE%") do set "CERT_THUMBPRINT=%%T"
+          if not defined CERT_THUMBPRINT ( echo certificate thumbprint missing & exit /b 1 )
+
+          rem ---------------------------------------------------------------
+          rem Package, catalog, and sign Cyclone2DpadFilter (HID upper filter).
+          rem ---------------------------------------------------------------
           set "OUT=%GITHUB_WORKSPACE%\x64\${{ matrix.configuration }}"
           set "PKG=%GITHUB_WORKSPACE%\package"
           if exist "%PKG%" rmdir /s /q "%PKG%"
@@ -106,40 +128,46 @@ jobs:
           copy /y "%OUT%\Cyclone2DpadFilter.sys" "%PKG%\" >nul
           copy /y "%OUT%\Cyclone2DpadFilter.inf" "%PKG%\" >nul
 
-          set "INF2CAT=%EWDK_DRIVE%:\Program Files\Windows Kits\10\bin\%WINSDKVER%\x86\inf2cat.exe"
-          if not exist "%INF2CAT%" set "INF2CAT=inf2cat.exe"
-          echo Using INF2CAT=%INF2CAT%
           "%INF2CAT%" /driver:"%PKG%" /os:10_19H1_X64
-          if errorlevel 1 ( echo inf2cat failed & exit /b 1 )
+          if errorlevel 1 ( echo inf2cat Cyclone2DpadFilter failed & exit /b 1 )
 
-          rem Create a temporary self-signed test certificate, sign the catalog,
-          rem and export the public certificate so the target PC can trust it.
-          rem Also import the test cert into the machine Root and TrustedPublisher
-          rem stores so the catalog's chain validates here (and to mirror what the
-          rem user must do on their own PC before installing).
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Cyclone2DpadFilter Test Certificate' -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -CertStoreLocation 'Cert:\CurrentUser\My' -NotAfter (Get-Date).AddYears(3); Export-Certificate -Cert $cert -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' | Out-Null; Import-Certificate -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' -CertStoreLocation 'Cert:\LocalMachine\Root' | Out-Null; Import-Certificate -FilePath '%PKG%\Cyclone2DpadFilter-TestCert.cer' -CertStoreLocation 'Cert:\LocalMachine\TrustedPublisher' | Out-Null; Set-Content -Path '%PKG%\Cyclone2DpadFilter-TestCert-Thumbprint.txt' -Value $cert.Thumbprint"
-          if errorlevel 1 ( echo certificate creation failed & exit /b 1 )
-
-          for /f "usebackq delims=" %%T in ("%PKG%\Cyclone2DpadFilter-TestCert-Thumbprint.txt") do set "CERT_THUMBPRINT=%%T"
-          if not defined CERT_THUMBPRINT ( echo certificate thumbprint missing & exit /b 1 )
-
-          set "SIGNTOOL=%EWDK_DRIVE%:\Program Files\Windows Kits\10\bin\%WINSDKVER%\x64\signtool.exe"
-          if not exist "%SIGNTOOL%" set "SIGNTOOL=signtool.exe"
-          echo Using SIGNTOOL=%SIGNTOOL%
           "%SIGNTOOL%" sign /fd SHA256 /sha1 %CERT_THUMBPRINT% "%PKG%\Cyclone2DpadFilter.cat"
-          if errorlevel 1 ( echo signtool sign failed & exit /b 1 )
-
+          if errorlevel 1 ( echo signtool sign Cyclone2DpadFilter failed & exit /b 1 )
           "%SIGNTOOL%" verify /v /pa "%PKG%\Cyclone2DpadFilter.cat"
-          if errorlevel 1 ( echo signtool verify failed & exit /b 1 )
+          if errorlevel 1 ( echo signtool verify Cyclone2DpadFilter failed & exit /b 1 )
 
-          rem Copy symbols after cataloging/signing so they are not part of the
-          rem signed driver package catalog.
+          copy /y "%CERTFILE%" "%PKG%\Cyclone2-TestCert.cer" >nul
+          copy /y "%THUMBFILE%" "%PKG%\Cyclone2-TestCert-Thumbprint.txt" >nul
           if exist "%OUT%\Cyclone2DpadFilter.pdb" copy /y "%OUT%\Cyclone2DpadFilter.pdb" "%PKG%\" >nul
 
-          echo === Package dir ===
+          echo === Cyclone2DpadFilter package ===
           dir /b "%PKG%"
 
-      - name: Upload build output
+          rem ---------------------------------------------------------------
+          rem Package, catalog, and sign Cyclone2UsbFilter (USB lower filter).
+          rem ---------------------------------------------------------------
+          set "PKG2=%GITHUB_WORKSPACE%\package-usb"
+          if exist "%PKG2%" rmdir /s /q "%PKG2%"
+          mkdir "%PKG2%"
+          copy /y "%OUT%\Cyclone2UsbFilter.sys" "%PKG2%\" >nul
+          copy /y "%OUT%\Cyclone2UsbFilter.inf" "%PKG2%\" >nul
+
+          "%INF2CAT%" /driver:"%PKG2%" /os:10_19H1_X64
+          if errorlevel 1 ( echo inf2cat Cyclone2UsbFilter failed & exit /b 1 )
+
+          "%SIGNTOOL%" sign /fd SHA256 /sha1 %CERT_THUMBPRINT% "%PKG2%\Cyclone2UsbFilter.cat"
+          if errorlevel 1 ( echo signtool sign Cyclone2UsbFilter failed & exit /b 1 )
+          "%SIGNTOOL%" verify /v /pa "%PKG2%\Cyclone2UsbFilter.cat"
+          if errorlevel 1 ( echo signtool verify Cyclone2UsbFilter failed & exit /b 1 )
+
+          copy /y "%CERTFILE%" "%PKG2%\Cyclone2-TestCert.cer" >nul
+          copy /y "%THUMBFILE%" "%PKG2%\Cyclone2-TestCert-Thumbprint.txt" >nul
+          if exist "%OUT%\Cyclone2UsbFilter.pdb" copy /y "%OUT%\Cyclone2UsbFilter.pdb" "%PKG2%\" >nul
+
+          echo === Cyclone2UsbFilter package ===
+          dir /b "%PKG2%"
+
+      - name: Upload Cyclone2DpadFilter package
         uses: actions/upload-artifact@v4
         with:
           name: Cyclone2DpadFilter-${{ matrix.configuration }}-${{ matrix.platform }}
@@ -150,4 +178,17 @@ jobs:
             package\*.cer
             package\*.txt
             package\*.pdb
+          if-no-files-found: error
+
+      - name: Upload Cyclone2UsbFilter package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cyclone2UsbFilter-${{ matrix.configuration }}-${{ matrix.platform }}
+          path: |
+            package-usb\*.sys
+            package-usb\*.inf
+            package-usb\*.cat
+            package-usb\*.cer
+            package-usb\*.txt
+            package-usb\*.pdb
           if-no-files-found: error
